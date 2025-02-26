@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from openai import OpenAI
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -10,7 +11,10 @@ client = OpenAI(api_key=openai_api_key)
 
 app = FastAPI()
 
-# GPT API 설정
+# 외부 파일에서 Prompt 로드
+def load_prompt_template():
+    with open('prompt_template.txt', 'r', encoding='utf-8') as file:
+        return file.read()
 
 # 임시 게임 세계 설정 함수
 def get_world_settings():
@@ -36,15 +40,18 @@ def get_npc_profile(npc_id):
 # NPC 대화 생성 함수
 def generate_npc_dialogue(npc, player_input):
     world = get_world_settings()
-    prompt = f"""
-    당신은 {world['game_genre']}의 {npc['personality']} 성격을 가진 {npc['role']}입니다. 플레이어와의 관계는 {npc['relationship']} 상태입니다.
-    시간은 {world['time']}이고 날씨는 {world['weather']}입니다.
 
-    [현재 플레이어 발언]
-    플레이어: {player_input}
+    prompt_template = load_prompt_template()
 
-    [NPC 답변]
-    """
+    prompt = prompt_template.format(
+        game_genre=world["game_genre"],
+        personality=npc["personality"],
+        role=npc["role"],
+        relationship=npc["relationship"],
+        time=world["time"],
+        weather=world["weather"],
+        player_input=player_input
+    )
 
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
