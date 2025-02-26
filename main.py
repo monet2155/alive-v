@@ -40,11 +40,25 @@ def get_npc_profile(npc_id):
     return npc_profiles.get(npc_id, {})
 
 
+# 대화 히스토리 임시 저장소
+conversation_history = {}
+
+
 # NPC 대화 생성 함수
-def generate_npc_dialogue(npc, player_input):
+def generate_npc_dialogue(npc_id, player_input):
+    npc = get_npc_profile(npc_id)
+
+    if not npc:
+        return {"error": "NPC not found"}
+
     world = get_world_settings()
 
     prompt_template = load_prompt_template()
+
+    history = conversation_history.get(npc_id, [])[:]
+    formatted_history = ""
+    for h in history:
+        formatted_history += f"플레이어: {h['player']}\nNPC: {h['npc']}\n"
 
     prompt = prompt_template.format(
         game_genre=world["game_genre"],
@@ -53,6 +67,7 @@ def generate_npc_dialogue(npc, player_input):
         relationship=npc["relationship"],
         time=world["time"],
         weather=world["weather"],
+        previous_conversation=formatted_history,
         player_input=player_input,
     )
 
@@ -63,15 +78,18 @@ def generate_npc_dialogue(npc, player_input):
         temperature=0.7,
     )
 
-    return response.choices[0].message.content
+    npc_response = response.choices[0].message.content
+
+    # 대화 히스토리에 저장
+    conversation_history.setdefault(npc_id, []).append(
+        {"player": player_input, "npc": npc_response}
+    )
+
+    return npc_response
 
 
 @app.get("/npc/{npc_id}/dialogue")
 def get_npc_dialogue(npc_id: str, player_input: str):
-    npc = get_npc_profile(npc_id)
 
-    if not npc:
-        return {"error": "NPC not found"}
-
-    dialogue = generate_npc_dialogue(npc, player_input)
+    dialogue = generate_npc_dialogue(npc_id, player_input)
     return {"npc_id": npc_id, "dialogue": dialogue}
