@@ -177,7 +177,7 @@ def end_session(session_id: str):
     # 세션 조회
     cursor.execute(
         """
-        SELECT "shortMemory"
+        SELECT "shortMemory", "npcId"
         FROM "ConversationSession"
         WHERE id = %s AND status = 'active'
         """,
@@ -192,12 +192,29 @@ def end_session(session_id: str):
     else:
         short_memory = session[0]
 
+    npc_id = session[1]
+
+    # NPC 이름 가져오기
+    cursor.execute(
+        """
+        SELECT name
+        FROM "Npc"
+        WHERE "id" = %s
+        """,
+        (npc_id,),
+    )
+    npc_row = cursor.fetchone()
+    npc_name = npc_row[0] if npc_row else "NPC"
+
     # 대화 전체 요약 프롬프트 생성
     summary_prompt = (
         "다음 대화를 한글로 간단히 요약해줘. 중요한 사건, 관계 변화 중심으로:\n"
     )
     summary_prompt += "\n".join(
-        [f"{msg['role']}: {msg['content']}" for msg in short_memory]
+        [
+            f"{'플레이어' if msg['role'] == 'user' else npc_name}: {msg['content']}"
+            for msg in short_memory
+        ]
     )
 
     # GPT로 요약 생성
