@@ -92,10 +92,6 @@ def generate_npc_dialogue(session_id: str, player_input: str):
 
     universe_id, npc_id, player_id, short_memory_json = session
 
-    print(universe_id)
-    print(npc_id)
-    print(player_id)
-
     universe = get_universe_settings(universe_id)
     npc = get_npc_profile(universe_id, npc_id)
 
