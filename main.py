@@ -84,9 +84,7 @@ def generate_npc_dialogue(session_id: str, player_input: str):
         """,
         (session_id,),
     )
-    print(2)
     session = cursor.fetchone()
-    print(3)
     if not session:
         return {"error": "세션이 존재하지 않거나 종료됨."}
 
