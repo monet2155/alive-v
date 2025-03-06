@@ -2,7 +2,11 @@ import json
 import uuid
 from ..database import get_connection, release_connection
 from ..config import client
-from ..prompts import load_prompt_template
+from ..prompts import (
+    load_prompt_template,
+    load_long_memory_summary_prompt,
+    load_important_memory_extract_prompt,
+)
 from .npc_service import (
     get_npc_profile,
     get_universe_settings,
@@ -129,14 +133,12 @@ def generate_long_memory(short_memory_json):
         for msg in short_memory
     )
 
-    prompt = (
-        "다음 대화를 한글로 간단히 요약해줘. 중요한 사건, 관계 변화 중심으로:\n"
-        + memory_text
-    )
+    long_memory_prompt = load_long_memory_summary_prompt()
+    summary_prompt = long_memory_prompt.format(conversation_history=memory_text)
 
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": summary_prompt}],
         max_tokens=300,
         temperature=0.5,
     )
@@ -154,15 +156,14 @@ def extract_important_memory(short_memory_json):
         for msg in short_memory
     )
 
-    prompt = (
-        "다음 대화에서 중요한 사건이나 관계 변화가 있었나요?\n"
-        "있다면 한 문장으로 요약해줘.\n"
-        "없다면 'false'라고 답해.\n\n" + memory_text
+    important_memory_prompt = load_important_memory_extract_prompt()
+    important_prompt = important_memory_prompt.format(
+        conversation_history=memory_text,
     )
 
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": important_prompt}],
         max_tokens=150,
         temperature=0.5,
     )

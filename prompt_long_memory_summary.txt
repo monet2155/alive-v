@@ -1,0 +1,16 @@
+# Long Memory Summary
+
+You are summarizing a conversation between an NPC and a player.
+
+Summarize the following conversation concisely in Korean, focusing on:
+- Key events
+- Changes in relationships
+- Notable dialogues or actions
+- Important atmosphere or emotional shifts
+
+Keep the summary brief and clear, suitable for long-term memory storage.
+
+## Conversation:
+{conversation_history}
+
+## Summary:

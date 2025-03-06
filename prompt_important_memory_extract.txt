@@ -1,0 +1,12 @@
+# Important Memory Extraction
+
+Analyze the following conversation between an NPC and a player.
+
+If there were any significant events, emotional changes, or important actions, summarize them concisely in Korean in one sentence.
+
+If nothing notable happened, respond with 'false'.
+
+## Conversation:
+{conversation_history}
+
+## Important Memory:

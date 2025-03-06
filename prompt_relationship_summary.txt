@@ -1,0 +1,13 @@
+# Relationship Summary
+
+Based on the following long memory summaries from past conversations between the NPC and the player, provide a one-sentence summary in Korean that captures:
+- The current relationship status between the player and NPC
+- The emotional atmosphere (e.g., tension, trust, hostility)
+- Significant developments over time
+
+Use natural language suitable for use in future conversations.
+
+## Long Memory Summaries:
+{long_memories}
+
+## Relationship Summary:

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from ..database import get_connection, release_connection
 from ..config import client
+from ..prompts import load_relationship_summary_prompt
 
 
 def get_important_memories(universe_id, npc_id, player_id):
@@ -62,8 +63,9 @@ def update_summary_memory(universe_id, npc_id, player_id):
             if not memories:
                 return
 
-            prompt = "다음 대화 요약들을 바탕으로 플레이어와의 관계와 분위기를 한 문장으로 요약해줘:\n" + "\n".join(
-                memories
+            relationship_summary_prompt = load_relationship_summary_prompt()
+            prompt = relationship_summary_prompt.format(
+                long_memories="\n".join(memories)
             )
 
             response = client.chat.completions.create(
