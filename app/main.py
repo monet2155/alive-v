@@ -12,4 +12,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["https://yourdomain.com"],
+#     allow_credentials=True,
+#     allow_methods=["GET", "POST"],
+#     allow_headers=["Authorization", "Content-Type"],
+# )
+
 app.include_router(npc_routes.router)
