@@ -1,4 +1,5 @@
 from ..database import get_connection, release_connection
+from ..config import client
 
 
 def get_npc_profile(universe_id, npc_id):
@@ -44,3 +45,24 @@ def get_universe_settings(universe_id):
         raise RuntimeError(f"세계관 설정 조회 실패: {e}")
     finally:
         release_connection(conn)
+
+
+def generate_npc_dialogue_with_continue(messages, max_tokens=500, temperature=0.7):
+    npc_response = ""
+    finish_reason = "length"
+
+    while finish_reason == "length":
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+        chunk = response.choices[0].message.content
+        finish_reason = response.choices[0].finish_reason
+
+        npc_response += chunk
+        messages.append({"role": "assistant", "content": chunk})
+
+    return npc_response

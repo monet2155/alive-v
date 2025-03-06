@@ -3,7 +3,11 @@ import uuid
 from ..database import get_connection, release_connection
 from ..config import client
 from ..prompts import load_prompt_template
-from .npc_service import get_npc_profile, get_universe_settings
+from .npc_service import (
+    get_npc_profile,
+    get_universe_settings,
+    generate_npc_dialogue_with_continue,
+)
 from .memory_service import (
     get_important_memories,
     get_summary_memory,
@@ -92,14 +96,8 @@ def generate_npc_dialogue(session_id, player_input):
 
             messages = [{"role": "system", "content": system_prompt}] + short_memory
 
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=100,
-                temperature=0.7,
-            )
+            npc_response = generate_npc_dialogue_with_continue(messages)
 
-            npc_response = response.choices[0].message.content
             short_memory.append({"role": "assistant", "content": npc_response})
 
             cursor.execute(
