@@ -7,6 +7,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from datetime import datetime
 
 load_dotenv()
 
@@ -75,6 +76,34 @@ def get_npc_profile(universe_id, npc_id):
     return {}
 
 
+def get_important_memories(universe_id, npc_id, player_id):
+    cursor.execute(
+        """
+        SELECT content
+        FROM "ImportantMemory"
+        WHERE "universeId" = %s AND "npcId" = %s AND "playerId" = %s
+        ORDER BY "createdAt" ASC
+        LIMIT 5
+        """,
+        (universe_id, npc_id, player_id),
+    )
+    rows = cursor.fetchall()
+    return [row[0] for row in rows]
+
+
+def get_summary_memory(universe_id, npc_id, player_id):
+    cursor.execute(
+        """
+        SELECT content
+        FROM "SummaryMemory"
+        WHERE "universeId" = %s AND "npcId" = %s AND "playerId" = %s
+        """,
+        (universe_id, npc_id, player_id),
+    )
+    row = cursor.fetchone()
+    return row[0] if row else "없음"
+
+
 def generate_npc_dialogue(session_id: str, player_input: str):
     cursor.execute(
         """
@@ -90,11 +119,18 @@ def generate_npc_dialogue(session_id: str, player_input: str):
 
     universe_id, npc_id, player_id, short_memory_json = session
 
-    universe = get_universe_settings(universe_id)
     npc = get_npc_profile(universe_id, npc_id)
-
     if not npc:
         return {"error": "NPC not found"}
+
+    universe = get_universe_settings(universe_id)
+    important_memories = get_important_memories(universe_id, npc_id, player_id)
+    summary_memory = get_summary_memory(universe_id, npc_id, player_id)
+
+    # 중요 기억 포맷팅
+    formatted_important_memories = (
+        "\n".join(f"- {memory}" for memory in important_memories) or "없음"
+    )
 
     prompt_template = load_prompt_template()
     system_prompt = prompt_template.format(
@@ -108,7 +144,8 @@ def generate_npc_dialogue(session_id: str, player_input: str):
         npc_gender=npc["gender"],
         npc_species=npc["species"],
         player_input=player_input,
-        long_term_memory="",  # TODO:
+        summary_memory=summary_memory,
+        important_memories=formatted_important_memories,
     )
 
     if isinstance(short_memory_json, str):
@@ -143,6 +180,52 @@ def generate_npc_dialogue(session_id: str, player_input: str):
     return npc_response
 
 
+def update_summary_memory(universe_id, npc_id, player_id):
+    # 최근 longMemory 5개 가져오기
+    cursor.execute(
+        """
+        SELECT "longMemory"
+        FROM "ConversationSession"
+        WHERE "universeId" = %s AND "npcId" = %s AND "playerId" = %s AND "longMemory" != ''
+        ORDER BY "endedAt" DESC
+        LIMIT 5
+        """,
+        (universe_id, npc_id, player_id),
+    )
+    rows = cursor.fetchall()
+    memories = [row[0] for row in rows]
+
+    if not memories:
+        return
+
+    prompt = "다음 대화 요약들을 바탕으로 플레이어와의 관계와 분위기를 한 문장으로 요약해줘:\n" + "\n".join(
+        memories
+    )
+
+    summary_response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=150,
+        temperature=0.5,
+    )
+    new_summary = summary_response.choices[0].message.content
+
+    # 현재 시간
+    now = datetime.utcnow()
+
+    # SummaryMemory 업데이트 또는 생성
+    cursor.execute(
+        """
+        INSERT INTO "SummaryMemory" (id, "universeId", "npcId", "playerId", content, "updatedAt")
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT ("universeId", "npcId", "playerId")
+        DO UPDATE SET content = EXCLUDED.content, "updatedAt" = NOW()
+        """,
+        (str(uuid.uuid4()), universe_id, npc_id, player_id, new_summary, now),
+    )
+    conn.commit()
+
+
 @app.post("/npc/{universe_id}/{npc_id}/start-session")
 def start_session(universe_id: str, npc_id: str, player_id: str):
     session_id = str(uuid.uuid4())
@@ -175,7 +258,7 @@ def end_session(session_id: str):
     # 세션 조회
     cursor.execute(
         """
-        SELECT "shortMemory", "npcId"
+        SELECT "universeId", "npcId", "playerId", "shortMemory"
         FROM "ConversationSession"
         WHERE id = %s AND status = 'active'
         """,
@@ -185,37 +268,21 @@ def end_session(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="세션이 존재하지 않거나 종료됨.")
 
-    if isinstance(session[0], str):
-        short_memory = json.loads(session[0])
-    else:
-        short_memory = session[0]
+    universe_id, npc_id, player_id, short_memory = session
 
-    npc_id = session[1]
-
-    # NPC 이름 가져오기
-    cursor.execute(
-        """
-        SELECT name
-        FROM "Npc"
-        WHERE "id" = %s
-        """,
-        (npc_id,),
-    )
-    npc_row = cursor.fetchone()
-    npc_name = npc_row[0] if npc_row else "NPC"
-
-    # 대화 전체 요약 프롬프트 생성
-    summary_prompt = (
-        "다음 대화를 한글로 간단히 요약해줘. 중요한 사건, 관계 변화 중심으로:\n"
-    )
-    summary_prompt += "\n".join(
+    # 요약용 프롬프트 생성
+    memory_text = "\n".join(
         [
-            f"{'플레이어' if msg['role'] == 'user' else npc_name}: {msg['content']}"
+            f"{'플레이어' if msg['role'] == 'user' else 'NPC'}: {msg['content']}"
             for msg in short_memory
         ]
     )
 
-    # GPT로 요약 생성
+    # ✅ 1️⃣ longMemory 생성
+    summary_prompt = (
+        "다음 대화를 한글로 간단히 요약해줘. 중요한 사건, 관계 변화 중심으로:\n"
+        + memory_text
+    )
     summary_response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": summary_prompt}],
@@ -224,7 +291,31 @@ def end_session(session_id: str):
     )
     long_memory = summary_response.choices[0].message.content
 
-    # 세션 종료 처리
+    # ✅ 2️⃣ 중요 기억 추출
+    important_prompt = (
+        "다음 대화에서 중요한 사건이나 관계 변화가 있었나요?\n"
+        "있다면 한 문장으로 요약해줘.\n"
+        "없다면 'false'이라고 답해.\n\n" + memory_text
+    )
+    important_response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": important_prompt}],
+        max_tokens=150,
+        temperature=0.5,
+    )
+    important_memory = important_response.choices[0].message.content.strip()
+
+    # ✅ 3️⃣ 중요 기억 저장 (있을 때만)
+    if important_memory != "false":
+        cursor.execute(
+            """
+            INSERT INTO "ImportantMemory" (id, "universeId", "npcId", "playerId", content)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (str(uuid.uuid4()), universe_id, npc_id, player_id, important_memory),
+        )
+
+    # ✅ 4️⃣ 세션 종료 처리
     cursor.execute(
         """
         UPDATE "ConversationSession"
@@ -235,4 +326,11 @@ def end_session(session_id: str):
     )
     conn.commit()
 
-    return {"status": "ended", "long_memory": long_memory}
+    # ✅ summaryMemory 갱신
+    update_summary_memory(universe_id, npc_id, player_id)
+
+    return {
+        "status": "ended",
+        "long_memory": long_memory,
+        "important_memory": important_memory if important_memory != "없음" else None,
+    }
