@@ -82,10 +82,10 @@ async def google_callback(code: str):
                 now = datetime.utcnow()
                 cursor.execute(
                     """
-                    INSERT INTO "User" (id, email, provider, "providerId", name, "createdAt", "updatedAt")
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO "User" (id, email, provider, "providerId", name, "createdAt")
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                    (user_id, email, "google", provider_id, name, now, now),
+                    (user_id, email, "GOOGLE", provider_id, name, now),
                 )
                 conn.commit()
             else:

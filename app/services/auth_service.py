@@ -40,10 +40,10 @@ def register_user(email: str, password: str, name: str = None):
 
             cursor.execute(
                 """
-                INSERT INTO "User" (id, email, password, name, "createdAt", "updatedAt")
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO "User" (id, email, password, name, "createdAt")
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (user_id, email, hashed_password, name, now, now),
+                (user_id, email, hashed_password, name, now),
             )
             conn.commit()
             return {"user_id": user_id}
