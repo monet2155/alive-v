@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Form, HTTPException, Depends
+from fastapi import APIRouter, status, Form, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from app.services.auth_service import (
     authenticate_user,
@@ -20,50 +20,72 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 @router.post("/register")
-async def register(
-    email: str = Form(...), password: str = Form(...), name: str = Form(...)
-):
-    conn = get_connection()
+async def register(request: Request):
     try:
-        with conn.cursor() as cursor:
-            # 이메일 중복 확인
-            cursor.execute('SELECT id FROM "User" WHERE email = %s', (email,))
-            if cursor.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="이미 등록된 이메일입니다",
-                )
+        form_data = await request.form()
+        email = form_data.get("email")
+        password = form_data.get("password")
+        name = form_data.get("name")
 
-            # 비밀번호 해싱
-            hashed_password = get_password_hash(password)
-
-            # 새 사용자 생성
-            user_id = str(uuid.uuid4())
-            now = datetime.utcnow()
-
-            cursor.execute(
-                """
-                INSERT INTO "User" (
-                    id, email, password, name,
-                    provider, "createdAt"
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id, email, name
-                """,
-                (user_id, email, hashed_password, name, "EMAIL", now),
+        if not email or not password or not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="필수 입력값이 누락되었습니다",
             )
-            user = cursor.fetchone()
-            conn.commit()
 
-            return {"id": user[0], "email": user[1], "name": user[2]}
+        conn = get_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 이메일 중복 확인
+                cursor.execute('SELECT id FROM "User" WHERE email = %s', (email,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="이미 등록된 이메일입니다",
+                    )
 
+                # 비밀번호 해싱
+                hashed_password = get_password_hash(password)
+
+                # 새 사용자 생성
+                user_id = str(uuid.uuid4())
+                now = datetime.utcnow()
+
+                cursor.execute(
+                    """
+                    INSERT INTO "User" (
+                        id, email, password, name,
+                        provider, "createdAt"
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, email, name
+                    """,
+                    (user_id, email, hashed_password, name, "EMAIL", now),
+                )
+                user = cursor.fetchone()
+                conn.commit()
+
+                return {"id": user[0], "email": user[1], "name": user[2]}
+
+        except HTTPException as he:
+            conn.rollback()
+            raise he
+        except Exception as e:
+            conn.rollback()
+            print(f"회원가입 에러: {str(e)}")  # 서버 로그에 원본 에러 출력
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="회원가입 중 오류가 발생했습니다",
+            )
+        finally:
+            release_connection(conn)
+    except HTTPException:
+        raise
     except Exception as e:
-        conn.rollback()
+        print(f"예상치 못한 에러: {str(e)}")  # 서버 로그에 원본 에러 출력
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="회원가입 중 오류가 발생했습니다",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="서버 오류가 발생했습니다",
         )
-    finally:
-        release_connection(conn)
 
 
 @router.post("/login")
