@@ -1,27 +1,65 @@
-from fastapi import APIRouter, status, Form, Depends
+from fastapi import APIRouter, status, Form, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from app.services.auth_service import (
-    register_user,
     authenticate_user,
     create_access_token,
     create_refresh_token,
     get_current_user,
 )
+from app.database import get_connection, release_connection
 import os
 import httpx
 import uuid
 from datetime import datetime
 from urllib.parse import urlencode
 
-router = APIRouter()
+router = APIRouter(prefix="/auth")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 @router.post("/register")
-def register(email: str = Form(...), password: str = Form(...), name: str = Form(None)):
-    result = register_user(email, password, name)
-    return {"message": "회원가입이 완료되었습니다.", "user_id": result["user_id"]}
+async def register(
+    email: str = Form(...), password: str = Form(...), name: str = Form(...)
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 이메일 중복 확인
+            cursor.execute('SELECT id FROM "User" WHERE email = %s', (email,))
+            if cursor.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 등록된 이메일입니다",
+                )
+
+            # 새 사용자 생성
+            user_id = str(uuid.uuid4())
+            now = datetime.utcnow()
+
+            cursor.execute(
+                """
+                INSERT INTO "User" (
+                    id, email, password, name,
+                    provider, "createdAt"
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id, email, name
+                """,
+                (user_id, email, password, name, "EMAIL", now),
+            )
+            user = cursor.fetchone()
+            conn.commit()
+
+            return {"id": user[0], "email": user[1], "name": user[2]}
+
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="회원가입 중 오류가 발생했습니다",
+        )
+    finally:
+        release_connection(conn)
 
 
 @router.post("/login")
@@ -67,20 +105,25 @@ async def google_callback(code: str):
             userinfo = userinfo_res.json()
 
         # 사용자 생성 또는 조회
-        from app.database import get_connection, release_connection
-
         conn = get_connection()
         try:
             with conn.cursor() as cursor:
+                # 기존 사용자 조회
                 cursor.execute(
                     'SELECT id FROM "User" WHERE email = %s', (userinfo["email"],)
                 )
                 user = cursor.fetchone()
 
                 if not user:
+                    # 새 사용자 생성
                     user_id = str(uuid.uuid4())
                     cursor.execute(
-                        'INSERT INTO "User" (id, email, provider, "providerId", name, "createdAt") VALUES (%s, %s, %s, %s, %s, %s)',
+                        """
+                        INSERT INTO "User" (
+                            id, email, provider, "providerId",
+                            name, "createdAt"
+                        ) VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
                         (
                             user_id,
                             userinfo["email"],
@@ -122,6 +165,6 @@ async def google_callback(code: str):
         )
 
 
-@router.get("/auth/me")
+@router.get("/me")
 async def get_me(user=Depends(get_current_user)):
     return user
