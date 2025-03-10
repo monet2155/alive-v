@@ -5,6 +5,7 @@ from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
     get_current_user,
+    get_password_hash,
 )
 from app.database import get_connection, release_connection
 import os
@@ -33,6 +34,9 @@ async def register(
                     detail="이미 등록된 이메일입니다",
                 )
 
+            # 비밀번호 해싱
+            hashed_password = get_password_hash(password)
+
             # 새 사용자 생성
             user_id = str(uuid.uuid4())
             now = datetime.utcnow()
@@ -45,7 +49,7 @@ async def register(
                 ) VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id, email, name
                 """,
-                (user_id, email, password, name, "EMAIL", now),
+                (user_id, email, hashed_password, name, "EMAIL", now),
             )
             user = cursor.fetchone()
             conn.commit()
