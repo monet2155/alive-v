@@ -1,15 +1,16 @@
-from fastapi import APIRouter, HTTPException, status, Form, Response
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi import APIRouter, status, Form, Depends
+from fastapi.responses import RedirectResponse
 from app.services.auth_service import (
     register_user,
     authenticate_user,
     create_access_token,
     create_refresh_token,
+    get_current_user,
 )
 import os
 import httpx
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from urllib.parse import urlencode
 
 router = APIRouter()
@@ -18,20 +19,13 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 @router.post("/register")
-def register(
-    email: str = Form(...),
-    password: str = Form(...),
-    name: str = Form(None),
-):
+def register(email: str = Form(...), password: str = Form(...), name: str = Form(None)):
     result = register_user(email, password, name)
     return {"message": "회원가입이 완료되었습니다.", "user_id": result["user_id"]}
 
 
 @router.post("/login")
-def login(
-    email: str = Form(...),
-    password: str = Form(...),
-):
+def login(email: str = Form(...), password: str = Form(...)):
     user = authenticate_user(email, password)
     access_token = create_access_token({"sub": user["user_id"]})
     refresh_token = create_refresh_token({"sub": user["user_id"]})
@@ -48,66 +42,71 @@ async def google_callback(code: str):
     google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
 
-    token_url = "https://oauth2.googleapis.com/token"
-    token_data = {
-        "code": code,
-        "client_id": google_client_id,
-        "client_secret": google_client_secret,
-        "redirect_uri": redirect_uri,
-        "grant_type": "authorization_code",
-    }
-
     try:
+        # 구글 토큰 획득
         async with httpx.AsyncClient() as client:
-            token_res = await client.post(token_url, data=token_data)
+            token_res = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": google_client_id,
+                    "client_secret": google_client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
             token_res.raise_for_status()
             tokens = token_res.json()
 
-            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-            headers = {"Authorization": f"Bearer {tokens['access_token']}"}
-            userinfo_res = await client.get(userinfo_url, headers=headers)
+            # 사용자 정보 획득
+            userinfo_res = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {tokens['access_token']}"},
+            )
             userinfo_res.raise_for_status()
             userinfo = userinfo_res.json()
 
-        email = userinfo["email"]
-        provider_id = userinfo["id"]
-        name = userinfo.get("name")
-
+        # 사용자 생성 또는 조회
         from app.database import get_connection, release_connection
 
         conn = get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute('SELECT id FROM "User" WHERE email = %s', (email,))
+                cursor.execute(
+                    'SELECT id FROM "User" WHERE email = %s', (userinfo["email"],)
+                )
                 user = cursor.fetchone()
 
                 if not user:
                     user_id = str(uuid.uuid4())
-                    now = datetime.utcnow()
                     cursor.execute(
-                        """
-                        INSERT INTO "User" (id, email, provider, "providerId", name, "createdAt")
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (user_id, email, "GOOGLE", provider_id, name, now),
+                        'INSERT INTO "User" (id, email, provider, "providerId", name, "createdAt") VALUES (%s, %s, %s, %s, %s, %s)',
+                        (
+                            user_id,
+                            userinfo["email"],
+                            "GOOGLE",
+                            userinfo["id"],
+                            userinfo.get("name"),
+                            datetime.utcnow(),
+                        ),
                     )
                     conn.commit()
                 else:
                     user_id = user[0]
 
+            # JWT 토큰 생성 및 리다이렉트
             access_token = create_access_token({"sub": user_id})
             refresh_token = create_refresh_token({"sub": user_id})
-
-            # 프론트엔드로 리다이렉트하면서 토큰 전달
             params = urlencode(
                 {"access_token": access_token, "refresh_token": refresh_token}
             )
+
             return RedirectResponse(
                 url=f"{FRONTEND_URL}/auth/callback/success?{params}",
                 status_code=status.HTTP_302_FOUND,
             )
 
-        except Exception as e:
+        except Exception:
             conn.rollback()
             return RedirectResponse(
                 url=f"{FRONTEND_URL}/auth/callback/error",
@@ -116,7 +115,13 @@ async def google_callback(code: str):
         finally:
             release_connection(conn)
 
-    except Exception as e:
+    except Exception:
         return RedirectResponse(
-            url=f"{FRONTEND_URL}/auth/callback/error", status_code=status.HTTP_302_FOUND
+            url=f"{FRONTEND_URL}/auth/callback/error",
+            status_code=status.HTTP_302_FOUND,
         )
+
+
+@router.get("/auth/me")
+async def get_me(user=Depends(get_current_user)):
+    return user
