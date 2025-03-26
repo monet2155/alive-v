@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  app:
+    image: python:3.11
+    container_name: alive-v-api-staging
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file:
+      - .env.staging
+    command: >
+      sh -c "
+      pip install poetry &&
+      poetry install &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+    ports:
+      - "8000:8000"
+
+  db:
+    image: postgres:15
+    container_name: alive-v-db-staging
+    environment:
+      POSTGRES_USER: monet
+      POSTGRES_PASSWORD: staging_password
+      POSTGRES_DB: alive_v_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+
+volumes:
+  postgres_data_staging:
