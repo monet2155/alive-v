@@ -18,17 +18,5 @@ services:
     ports:
       - "8000:8000"
 
-  db:
-    image: postgres:15
-    container_name: alive-v-db-staging
-    environment:
-      POSTGRES_USER: monet
-      POSTGRES_PASSWORD: staging_password
-      POSTGRES_DB: alive_v_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data_staging:/var/lib/postgresql/data
-
 volumes:
   postgres_data_staging:
