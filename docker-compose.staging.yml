@@ -4,7 +4,7 @@ version: "3.9"
 services:
   app:
     image: python:3.11
-    container_name: alive-v-api-staging
+    container_name: alive-v-api
     working_dir: /app
     volumes:
       - .:/app
@@ -14,10 +14,34 @@ services:
       sh -c "
       pip install poetry &&
       poetry install &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000
       "
+    depends_on:
+      - postgres
     ports:
-      - "8000:8000"
+      - "8080:8000"
+    networks:
+      - caddy_network # Caddy 네트워크에 추가
+
+  postgres:
+    image: postgres:15
+    container_name: alive-v-db
+    restart: always
+    environment:
+      POSTGRES_USER: alive_v_user
+      POSTGRES_PASSWORD: alive_v_password
+      POSTGRES_DB: alive_v_db
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - caddy_network
 
 volumes:
   postgres_data_staging:
+
+networks:
+  caddy_network:
+    name: caddy_network
+    external: true
