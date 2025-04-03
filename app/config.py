@@ -29,7 +29,7 @@ class AIClientDelegate:
         if provider == "openai":
             return self.openai_client.chat.completions.create(
                 **kwargs,
-                model="gpt-3.5-turbo",
+                model="gpt-4-turbo",
             )
         elif provider == "claude":
             return self.claude_client.messages.create(
