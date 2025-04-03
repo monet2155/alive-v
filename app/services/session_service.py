@@ -48,12 +48,13 @@ def build_messages(provider, system_prompt, short_memory, player_input):
     if provider == "openai":
         messages = [{"role": "system", "content": system_prompt}]
         messages += short_memory
-        messages.append({"role": "user", "content": player_input})
+        messages.append({"role": "user", "content": player_input})  # ✔️ 여기만 추가
         return messages
 
     elif provider == "claude":
-        # player_input은 이미 short_memory에 포함되어야 함
-        return build_claude_message(system_prompt, short_memory)
+        return build_claude_message(
+            system_prompt, short_memory
+        )  # ❌ player_input 다시 넣지 않음
 
     else:
         raise ValueError(f"지원하지 않는 provider: {provider}")
@@ -136,21 +137,26 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
             except (json.JSONDecodeError, TypeError):
                 short_memory = []
 
-            # Claude는 prompt에서 직접 대사 조립하므로 복사본 사용
-            short_memory_for_prompt = short_memory.copy()
-            short_memory_for_prompt.append({"role": "user", "content": player_input})
+            # 2. Claude일 경우 prompt 조립용으로 미리 복사 & append
+            if provider == "claude":
+                short_memory_for_prompt = short_memory.copy()
+                short_memory_for_prompt.append(
+                    {"role": "user", "content": player_input}
+                )
+            else:
+                short_memory_for_prompt = short_memory.copy()
 
-            # 메시지 구성
+            # 3. 메시지 구성 (Claude에선 player_input 없이 메시지 구성됨)
             messages = build_messages(
                 provider, system_prompt, short_memory_for_prompt, player_input
             )
 
-            # 응답 생성
+            # 4. LLM 호출
             npc_response = generate_npc_dialogue_with_continue(
                 messages, provider=provider
             )
 
-            # 최종 short memory 갱신 (DB 저장용)
+            # 5. 최종 short_memory 저장용 업데이트 (공통)
             short_memory.append({"role": "user", "content": player_input})
             short_memory.append({"role": "assistant", "content": npc_response})
 
