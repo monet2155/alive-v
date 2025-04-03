@@ -50,13 +50,34 @@ def build_messages(provider, system_prompt, short_memory, player_input):
         messages += short_memory
         messages.append({"role": "user", "content": player_input})
         return messages
-    elif provider == "claude":
-        base_user_prompt = f"""{system_prompt}
 
-플레이어: {player_input}"""
-        return [{"role": "user", "content": base_user_prompt}]
+    elif provider == "claude":
+        # player_input은 이미 short_memory에 포함되어야 함
+        return build_claude_message(system_prompt, short_memory)
+
     else:
         raise ValueError(f"지원하지 않는 provider: {provider}")
+
+
+def build_claude_message(system_prompt, short_memory, player_input=None):
+    history_str = ""
+    for msg in short_memory:
+        if msg["role"] == "user":
+            history_str += f"\n플레이어: {msg['content']}"
+        elif msg["role"] == "assistant":
+            history_str += f"\nNPC: {msg['content']}"
+
+    # ⚠️ 여기서 player_input은 이미 short_memory에 들어간 상태이므로 따로 추가하지 않음
+    return [
+        {
+            "role": "user",
+            "content": f"""{system_prompt}
+
+# Current Role-play
+{history_str}
+""",
+        }
+    ]
 
 
 def generate_npc_dialogue(session_id, player_input, provider="openai"):
@@ -68,7 +89,7 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                 SELECT "universeId", "npcId", "playerId", "shortMemory"
                 FROM "ConversationSession"
                 WHERE id = %s AND status = 'active'
-            """,
+                """,
                 (session_id,),
             )
             session = cursor.fetchone()
@@ -104,7 +125,7 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                 important_memories=formatted_important_memories,
             )
 
-            # 단기 기억 처리
+            # 단기 기억 불러오기
             try:
                 if isinstance(short_memory_json, str):
                     short_memory = json.loads(short_memory_json)
@@ -115,16 +136,13 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
             except (json.JSONDecodeError, TypeError):
                 short_memory = []
 
-            # short_memory 업데이트 (Claude는 prompt에 포함하므로 다르게 처리)
-            if provider == "openai":
-                short_memory.append({"role": "user", "content": player_input})
-
-            if len(short_memory) > MAX_MEMORY_LENGTH:
-                short_memory = short_memory[-MAX_MEMORY_LENGTH:]
+            # Claude는 prompt에서 직접 대사 조립하므로 복사본 사용
+            short_memory_for_prompt = short_memory.copy()
+            short_memory_for_prompt.append({"role": "user", "content": player_input})
 
             # 메시지 구성
             messages = build_messages(
-                provider, system_prompt, short_memory, player_input
+                provider, system_prompt, short_memory_for_prompt, player_input
             )
 
             # 응답 생성
@@ -132,8 +150,12 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                 messages, provider=provider
             )
 
-            # short memory에 assistant 응답 추가
+            # 최종 short memory 갱신 (DB 저장용)
+            short_memory.append({"role": "user", "content": player_input})
             short_memory.append({"role": "assistant", "content": npc_response})
+
+            if len(short_memory) > MAX_MEMORY_LENGTH:
+                short_memory = short_memory[-MAX_MEMORY_LENGTH:]
 
             # DB에 업데이트
             cursor.execute(
@@ -141,7 +163,7 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                 UPDATE "ConversationSession"
                 SET "shortMemory" = %s
                 WHERE id = %s
-            """,
+                """,
                 (json.dumps(short_memory), session_id),
             )
             conn.commit()
