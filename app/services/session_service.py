@@ -1,7 +1,7 @@
 import json
 import uuid
 from ..database import get_connection, release_connection
-from ..config import client
+from ..config import ai_client_delegate
 from ..prompts import (
     load_prompt_template,
     load_long_memory_summary_prompt,
@@ -22,7 +22,9 @@ MAX_MEMORY_LENGTH = 20
 
 
 def start_session(universe_id, npc_id, player_id):
+    print(f"세션 시작: {universe_id}, {npc_id}, {player_id}")
     conn = get_connection()
+    print(f"DB 연결: {conn}")
     try:
         with conn.cursor() as cursor:
             session_id = str(uuid.uuid4())
@@ -42,7 +44,22 @@ def start_session(universe_id, npc_id, player_id):
         release_connection(conn)
 
 
-def generate_npc_dialogue(session_id, player_input):
+def build_messages(provider, system_prompt, short_memory, player_input):
+    if provider == "openai":
+        messages = [{"role": "system", "content": system_prompt}]
+        messages += short_memory
+        messages.append({"role": "user", "content": player_input})
+        return messages
+    elif provider == "claude":
+        base_user_prompt = f"""{system_prompt}
+
+플레이어: {player_input}"""
+        return [{"role": "user", "content": base_user_prompt}]
+    else:
+        raise ValueError(f"지원하지 않는 provider: {provider}")
+
+
+def generate_npc_dialogue(session_id, player_input, provider="openai"):
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
@@ -59,6 +76,8 @@ def generate_npc_dialogue(session_id, player_input):
                 return {"error": "세션이 존재하지 않거나 종료됨."}
 
             universe_id, npc_id, player_id, short_memory_json = session
+
+            # 컨텍스트 데이터 조회
             npc = get_npc_profile(universe_id, npc_id)
             universe = get_universe_settings(universe_id)
             important_memories = get_important_memories(universe_id, npc_id, player_id)
@@ -67,6 +86,8 @@ def generate_npc_dialogue(session_id, player_input):
             formatted_important_memories = (
                 "\n".join(f"- {memory}" for memory in important_memories) or "없음"
             )
+
+            # 프롬프트 템플릿 적용
             prompt_template = load_prompt_template()
             system_prompt = prompt_template.format(
                 universe_name=universe.get("name", "알 수 없음"),
@@ -83,6 +104,7 @@ def generate_npc_dialogue(session_id, player_input):
                 important_memories=formatted_important_memories,
             )
 
+            # 단기 기억 처리
             try:
                 if isinstance(short_memory_json, str):
                     short_memory = json.loads(short_memory_json)
@@ -93,17 +115,27 @@ def generate_npc_dialogue(session_id, player_input):
             except (json.JSONDecodeError, TypeError):
                 short_memory = []
 
-            short_memory.append({"role": "user", "content": player_input})
+            # short_memory 업데이트 (Claude는 prompt에 포함하므로 다르게 처리)
+            if provider == "openai":
+                short_memory.append({"role": "user", "content": player_input})
 
             if len(short_memory) > MAX_MEMORY_LENGTH:
                 short_memory = short_memory[-MAX_MEMORY_LENGTH:]
 
-            messages = [{"role": "system", "content": system_prompt}] + short_memory
+            # 메시지 구성
+            messages = build_messages(
+                provider, system_prompt, short_memory, player_input
+            )
 
-            npc_response = generate_npc_dialogue_with_continue(messages)
+            # 응답 생성
+            npc_response = generate_npc_dialogue_with_continue(
+                messages, provider=provider
+            )
 
+            # short memory에 assistant 응답 추가
             short_memory.append({"role": "assistant", "content": npc_response})
 
+            # DB에 업데이트
             cursor.execute(
                 """
                 UPDATE "ConversationSession"
@@ -115,6 +147,7 @@ def generate_npc_dialogue(session_id, player_input):
             conn.commit()
 
         return npc_response
+
     except Exception as e:
         conn.rollback()
         raise RuntimeError(f"대화 생성 실패: {e}")
@@ -122,7 +155,7 @@ def generate_npc_dialogue(session_id, player_input):
         release_connection(conn)
 
 
-def generate_long_memory(short_memory_json):
+def generate_long_memory(short_memory_json, provider="openai"):
     if isinstance(short_memory_json, str):
         short_memory = json.loads(short_memory_json)
     else:
@@ -136,7 +169,8 @@ def generate_long_memory(short_memory_json):
     long_memory_prompt = load_long_memory_summary_prompt()
     summary_prompt = long_memory_prompt.format(conversation_history=memory_text)
 
-    response = client.chat.completions.create(
+    response = ai_client_delegate.generate_response(
+        provider=provider,
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": summary_prompt}],
         max_tokens=300,
@@ -145,7 +179,7 @@ def generate_long_memory(short_memory_json):
     return response.choices[0].message.content
 
 
-def extract_important_memory(short_memory_json):
+def extract_important_memory(short_memory_json, provider="openai"):
     if isinstance(short_memory_json, str):
         short_memory = json.loads(short_memory_json)
     else:
@@ -161,7 +195,8 @@ def extract_important_memory(short_memory_json):
         conversation_history=memory_text,
     )
 
-    response = client.chat.completions.create(
+    response = ai_client_delegate.generate_response(
+        provider=provider,
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": important_prompt}],
         max_tokens=150,
