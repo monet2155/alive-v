@@ -12,7 +12,9 @@ def start_npc_session(universe_id: UUID4, npc_id: UUID4, body: SessionStartReque
         f"Starting session for universe_id: {universe_id}, npc_id: {npc_id}, player_id: {body.player_id}"
     )
     try:
-        session_id = start_session(str(universe_id), str(npc_id), str(body.player_id))
+        session_id = start_session(
+            str(universe_id), str(npc_id), str(body.player_id), str(body.event_id)
+        )
         return {"session_id": session_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -21,7 +21,7 @@ from .memory_service import (
 MAX_MEMORY_LENGTH = 20
 
 
-def start_session(universe_id, npc_id, player_id):
+def start_session(universe_id, npc_id, player_id, event_id: str | None = None):
     print(f"세션 시작: {universe_id}, {npc_id}, {player_id}")
     conn = get_connection()
     print(f"DB 연결: {conn}")
@@ -30,10 +30,10 @@ def start_session(universe_id, npc_id, player_id):
             session_id = str(uuid.uuid4())
             cursor.execute(
                 """
-                INSERT INTO "ConversationSession" (id, "universeId", "npcId", "playerId", "shortMemory", status)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO "ConversationSession" (id, "universeId", "npcId", "playerId", "shortMemory", status, "eventId")
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
-                (session_id, universe_id, npc_id, player_id, "[]", "active"),
+                (session_id, universe_id, npc_id, player_id, "[]", "active", event_id),
             )
             conn.commit()
         return session_id

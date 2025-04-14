@@ -1,4 +1,5 @@
 from pydantic import BaseModel, UUID4
+from typing import Optional
 
 
 class DialogueRequest(BaseModel):
@@ -13,3 +14,4 @@ class SessionRequest(BaseModel):
 
 class SessionStartRequest(BaseModel):
     player_id: UUID4
+    event_id: Optional[str] = None  # optional하게 이벤트 지정 가능
