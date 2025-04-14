@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import npc_routes
+from .routes import npc_routes, event_routes
 
 app = FastAPI()
 
@@ -21,3 +21,4 @@ app.add_middleware(
 # )
 
 app.include_router(npc_routes.router)
+app.include_router(event_routes.router)
