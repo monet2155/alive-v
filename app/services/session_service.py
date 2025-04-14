@@ -144,17 +144,18 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                     FROM "EventStep"
                     WHERE "eventId" = %s
                     ORDER BY "order" ASC
-                    LIMIT 1
-                """,
+                    """,
                     (str(event_id),),
                 )
-                step_row = cursor.fetchone()
-                if step_row:
-                    first_content = step_row[0]
-                    print(f"이벤트 시작 메시지: {first_content}")
-                    short_memory.insert(
-                        0, {"role": "assistant", "content": first_content}
-                    )
+                step_rows = cursor.fetchall()
+                if step_rows:
+                    print(f"이벤트 메시지 {len(step_rows)}개 로드됨")
+                    for step_row in step_rows:
+                        event_message = step_row[0]
+                        print(f"이벤트 메시지: {event_message}")
+                        short_memory.append(
+                            {"role": "assistant", "content": event_message}
+                        )
 
             print(f"단기 기억: {short_memory}")
 
