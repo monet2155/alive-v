@@ -87,7 +87,7 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT "universeId", "npcId", "playerId", "shortMemory"
+                SELECT "universeId", "npcId", "playerId", "shortMemory", "eventId"
                 FROM "ConversationSession"
                 WHERE id = %s AND status = 'active'
                 """,
@@ -97,7 +97,7 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
             if not session:
                 return {"error": "세션이 존재하지 않거나 종료됨."}
 
-            universe_id, npc_id, player_id, short_memory_json = session
+            universe_id, npc_id, player_id, short_memory_json, event_id = session
 
             # 컨텍스트 데이터 조회
             npc = get_npc_profile(universe_id, npc_id)
@@ -136,6 +136,27 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                     short_memory = []
             except (json.JSONDecodeError, TypeError):
                 short_memory = []
+
+            if event_id and len(short_memory) == 0:
+                cursor.execute(
+                    """
+                    SELECT message
+                    FROM "EventStep"
+                    WHERE "eventId" = %s
+                    ORDER BY "order" ASC
+                    LIMIT 1
+                """,
+                    (str(event_id),),
+                )
+                step_row = cursor.fetchone()
+                if step_row:
+                    first_content = step_row[0]
+                    print(f"이벤트 시작 메시지: {first_content}")
+                    short_memory.insert(
+                        0, {"role": "assistant", "content": first_content}
+                    )
+
+            print(f"단기 기억: {short_memory}")
 
             # 2. Claude일 경우 prompt 조립용으로 미리 복사 & append
             if provider == "claude":
