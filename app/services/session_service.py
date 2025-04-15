@@ -66,7 +66,7 @@ def build_claude_message(system_prompt, short_memory, player_input=None):
         if msg["role"] == "user":
             history_str += f"\n플레이어: {msg['content']}"
         elif msg["role"] == "assistant":
-            history_str += f"\nNPC: {msg['content']}"
+            history_str += f"\n{msg['content']}"
 
     # ⚠️ 여기서 player_input은 이미 short_memory에 들어간 상태이므로 따로 추가하지 않음
     return [
@@ -140,7 +140,7 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
             if event_id and len(short_memory) == 0:
                 cursor.execute(
                     """
-                    SELECT message
+                    SELECT message, "speakerType", "speakerId"
                     FROM "EventStep"
                     WHERE "eventId" = %s
                     ORDER BY "order" ASC
@@ -152,7 +152,24 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
                     print(f"이벤트 메시지 {len(step_rows)}개 로드됨")
                     for step_row in step_rows:
                         event_message = step_row[0]
-                        print(f"이벤트 메시지: {event_message}")
+                        speaker_type = step_row[1]
+                        speaker_id = step_row[2]
+                        print(
+                            f"이벤트 메시지: {speaker_type}({speaker_id}) {event_message}"
+                        )
+                        if speaker_type == "PLAYER":
+                            short_memory.append(
+                                {"role": "user", "content": event_message}
+                            )
+                        elif speaker_type == "NPC":
+                            # NPC의 경우, NPC ID를 기반으로 NPC Name 확인하여 short_memory에 추가
+                            npc_name = (
+                                npc["name"] if speaker_id == npc_id else "알 수 없음"
+                            )
+                            event_message = f"{npc_name}: {event_message}"
+                        else:
+                            event_message = f"{speaker_type}: {event_message}"
+
                         short_memory.append(
                             {"role": "assistant", "content": event_message}
                         )
