@@ -49,11 +49,12 @@ def update_summary_memory(universe_id, npc_id, player_id):
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT "longMemory"
-                FROM "ConversationSession"
-                WHERE "universeId" = %s AND "npcId" = %s AND "playerId" = %s
-                AND "longMemory" != ''
-                ORDER BY "endedAt" DESC
+                SELECT cs."longMemory"
+                FROM "ConversationSession" cs
+                JOIN "ConversationSessionNpc" csn ON cs.id = csn."conversationSessionId"
+                WHERE cs."universeId" = %s AND csn."npcId" = %s AND cs."playerId" = %s
+                AND cs."longMemory" != ''
+                ORDER BY cs."endedAt" DESC
                 LIMIT 5
             """,
                 (universe_id, npc_id, player_id),
