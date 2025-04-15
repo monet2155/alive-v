@@ -286,14 +286,13 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
             npc_ids = cursor.fetchall()
             if not npc_ids or len(npc_ids) < 2:
                 return {"error": "다중 NPC 세션이 아님 (NPC 수가 2 미만)."}
-
             universe_id, player_id, short_memory_json, event_id = session
 
             # NPC 리스트 구성
             npcs = []
             for npc_id in npc_ids:
-                npc_id = npc_id[0]
                 npc = get_npc_profile(universe_id, npc_id)
+                npc["id"] = npc_id[0]  # NPC ID 추가
                 npcs.append(npc)
             if not npcs:
                 return {"error": "NPC 정보를 불러오는 데 실패했습니다."}
@@ -305,7 +304,6 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
             npc_profiles = []
             for npc in npcs:
                 npc_id = npc["id"]
-                npc = get_npc_profile(universe_id, npc_id)
                 summary_memory = get_summary_memory(universe_id, npc_id, player_id)
                 important_memories = get_important_memories(
                     universe_id, npc_id, player_id
