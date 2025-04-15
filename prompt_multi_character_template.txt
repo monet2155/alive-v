@@ -50,6 +50,10 @@ This conversation takes place in the world of {universe_description}, and the ru
 - Choose the most emotionally reactive NPCs to speak first.
 - Do not always speak in the same order.
 - NPCs may respond to or comment on each other's statements when appropriate.
+- Multiple NPCs may speak in the same turn, and it is encouraged when the context allows.
+- Each NPC line must start with their name, like: 이름: 대사\n이름: 대사
+- NPCs may interrupt each other, react instantly, or speak simultaneously if the situation fits.
+- Avoid artificial turn-taking. Let dialogue flow dynamically.
 
 ## Important
 - Do not use narration or descriptions.
