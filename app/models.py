@@ -14,4 +14,5 @@ class SessionRequest(BaseModel):
 
 class SessionStartRequest(BaseModel):
     player_id: UUID4
-    event_id: Optional[str] = None  # optional하게 이벤트 지정 가능
+    event_id: Optional[UUID4] = None  # optional하게 이벤트 지정 가능
+    npcs: list[UUID4]  # NPCs는 UUID4 리스트로 지정

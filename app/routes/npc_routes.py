@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from uuid import UUID
 from pydantic import UUID4
 from ..models import DialogueRequest, SessionStartRequest
 from ..services.session_service import start_session, generate_npc_dialogue, end_session
@@ -6,14 +7,28 @@ from ..services.session_service import start_session, generate_npc_dialogue, end
 router = APIRouter()
 
 
-@router.post("/npc/{universe_id}/{npc_id}/start-session")
-def start_npc_session(universe_id: UUID4, npc_id: UUID4, body: SessionStartRequest):
+@router.post("/npc/{universe_id}/start-session")
+def start_npc_session(universe_id: UUID4, body: SessionStartRequest):
     print(
-        f"Starting session for universe_id: {universe_id}, npc_id: {npc_id}, player_id: {body.player_id}"
+        f"Starting session for universe_id: {universe_id}, npc_ids: {body.npcs}, player_id: {body.player_id}"
     )
+    if not body.npcs or not body.player_id:
+        raise HTTPException(
+            status_code=400, detail="NPCs and player ID must be provided."
+        )
+    if not isinstance(body.npcs, list):
+        raise HTTPException(status_code=400, detail="NPCs must be a list.")
+    if not all(isinstance(npc, UUID) for npc in body.npcs):
+        raise HTTPException(status_code=400, detail="All NPCs must be UUID.")
+    if not isinstance(body.player_id, UUID):
+        raise HTTPException(status_code=400, detail="Player ID must be a UUID.")
+    if not isinstance(body.event_id, UUID):
+        raise HTTPException(status_code=400, detail="Event ID must be a UUID.")
+    if not body.event_id:
+        raise HTTPException(status_code=400, detail="Event ID must be provided.")
     try:
         session_id = start_session(
-            str(universe_id), str(npc_id), str(body.player_id), str(body.event_id)
+            str(universe_id), body.npcs, str(body.player_id), str(body.event_id)
         )
         return {"session_id": session_id}
     except Exception as e:
