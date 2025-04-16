@@ -22,13 +22,11 @@ def start_npc_session(universe_id: UUID4, body: SessionStartRequest):
         raise HTTPException(status_code=400, detail="All NPCs must be UUID.")
     if not isinstance(body.player_id, UUID):
         raise HTTPException(status_code=400, detail="Player ID must be a UUID.")
-    if not isinstance(body.event_id, UUID):
+    if body.event_id and not isinstance(body.event_id, UUID):
         raise HTTPException(status_code=400, detail="Event ID must be a UUID.")
-    if not body.event_id:
-        raise HTTPException(status_code=400, detail="Event ID must be provided.")
     try:
         session_id = start_session(
-            str(universe_id), body.npcs, str(body.player_id), str(body.event_id)
+            str(universe_id), body.npcs, str(body.player_id), body.event_id
         )
         return {"session_id": session_id}
     except Exception as e:

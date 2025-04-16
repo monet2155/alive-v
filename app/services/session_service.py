@@ -24,8 +24,8 @@ MAX_MEMORY_LENGTH = 20
 
 
 # 단일 세션 시작
-def start_session(universe_id, npcs, player_id, event_id: str | None = None):
-    print(f"세션 시작: {universe_id}, {npcs}, {player_id}")
+def start_session(universe_id, npcs, player_id, event_id: uuid.UUID | None = None):
+    print(f"세션 시작: {universe_id}, {npcs}, {player_id}, {event_id}")
     conn = get_connection()
     print(f"DB 연결: {conn}")
     try:
@@ -36,7 +36,14 @@ def start_session(universe_id, npcs, player_id, event_id: str | None = None):
                 INSERT INTO "ConversationSession" (id, "universeId", "playerId", "shortMemory", status, "eventId")
                 VALUES (%s, %s, %s, %s, %s, %s)
             """,
-                (session_id, universe_id, player_id, "[]", "active", event_id),
+                (
+                    session_id,
+                    universe_id,
+                    player_id,
+                    "[]",
+                    "active",
+                    str(event_id) if event_id is not None else None,
+                ),
             )
             for npc_id in npcs:
                 # NPC 세션 생성
