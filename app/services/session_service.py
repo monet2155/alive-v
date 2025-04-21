@@ -135,10 +135,11 @@ def generate_single_npc_dialogue(session_id, player_input, provider="openai"):
             print(f"세션 정보: {session}")
 
             event_goal_description = None
+            event_goal_trigger = None
             if event_id:
                 cursor.execute(
                     """
-                    SELECT "goalDescription"
+                    SELECT "goalDescription", "goalTrigger"
                     FROM "Event"
                     WHERE id = %s
                     """,
@@ -147,6 +148,7 @@ def generate_single_npc_dialogue(session_id, player_input, provider="openai"):
                 row = cursor.fetchone()
                 if row and row[0]:
                     event_goal_description = row[0]
+                    event_goal_trigger = row[1]
 
             # 컨텍스트 데이터 조회
             npc = get_npc_profile(universe_id, npc_id)
@@ -179,6 +181,7 @@ def generate_single_npc_dialogue(session_id, player_input, provider="openai"):
                 npc_prompt=npc_prompt,
                 dialogue_examples="없음",  # FIXME: 대화 예시 추가
                 event_goal=event_goal_description or "없음",  # 추가
+                goal_trigger=event_goal_trigger or "없음",  # 추가
             )
 
             # 단기 기억 불러오기
@@ -310,10 +313,11 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
             universe_id, player_id, short_memory_json, event_id = session
 
             event_goal_description = None
+            event_goal_trigger = None
             if event_id:
                 cursor.execute(
                     """
-                    SELECT "goalDescription"
+                    SELECT "goalDescription", "goalTrigger"
                     FROM "Event"
                     WHERE id = %s
                     """,
@@ -322,6 +326,7 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
                 row = cursor.fetchone()
                 if row and row[0]:
                     event_goal_description = row[0]
+                    event_goal_trigger = row[1]
 
             # NPC 리스트 구성
             npcs = []
@@ -370,6 +375,7 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
                 player_input=player_input,
                 dialogue_examples="없음",  # FIXME: 대화 예시 추가
                 event_goal=event_goal_description or "없음",  # 추가
+                goal_trigger=event_goal_trigger or "없음",  # 추가
             )
 
             # 단기 기억 불러오기
