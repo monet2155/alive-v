@@ -165,6 +165,7 @@ def generate_single_npc_dialogue(session_id, player_input, provider="openai"):
                 universe_rules=universe.get("rules", "없음"),
                 player_input=player_input,
                 npc_prompt=npc_prompt,
+                dialogue_examples="없음",  # FIXME: 대화 예시 추가
             )
 
             # 단기 기억 불러오기
@@ -340,6 +341,7 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
                 universe_rules=universe.get("rules", ""),
                 npc_profiles="\n\n".join(npc_profiles),
                 player_input=player_input,
+                dialogue_examples="없음",  # FIXME: 대화 예시 추가
             )
 
             # 단기 기억 불러오기

@@ -1,10 +1,19 @@
+is_v2 = True
+
+
 def load_prompt_template():
-    with open("prompt_template.txt", "r", encoding="utf-8") as file:
+    with open(
+        f"prompt_template{is_v2 and '_v2' or ''}.txt", "r", encoding="utf-8"
+    ) as file:
         return file.read()
 
 
 def load_multi_character_prompt_template():
-    with open("prompt_multi_character_template.txt", "r", encoding="utf-8") as file:
+    with open(
+        f"prompt_multi_character_template{is_v2 and '_v2' or ''}.txt",
+        "r",
+        encoding="utf-8",
+    ) as file:
         return file.read()
 
 
