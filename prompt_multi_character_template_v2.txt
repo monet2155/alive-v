@@ -13,6 +13,10 @@
 ## NPC Profiles
 {npc_profiles}
 
+## Story Goal
+The current scenario has a clear narrative goal:
+{event_goal}
+
 ## Role-playing Instructions
 - Only respond as the NPCs listed in the profiles. Do **not** speak for the player.
 - You must never write or generate the player's dialogue (e.g., "플레이어: ..."). Only respond as the NPCs.
