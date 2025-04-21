@@ -71,19 +71,50 @@ def generate_npc_dialogue_with_continue(
         return npc_response
 
     elif provider == "claude":
-        response = ai_client_delegate.generate_response(
-            provider=provider,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        complete_response = ""
+        stop_reason = "max_tokens"
+        working_messages = messages.copy()
 
-        # Claude 응답 구조 예시: {"content": [{"type": "text", "text": "..."}]}
-        contents = response.content  # 이건 Claude SDK 기준임
-        text_chunks = [c.text for c in contents if c.type == "text"]
-        npc_response = "".join(text_chunks)
+        # stop_reason이 max_tokens인 경우 계속 응답을 생성합니다
+        while stop_reason == "max_tokens":
+            response = ai_client_delegate.generate_response(
+                provider=provider,
+                messages=working_messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
 
-        return npc_response
+            # 응답 추출
+            new_content = response.content[0].text
+            stop_reason = response.stop_reason
+
+            # 공백 제거 - 끝에 있는 공백 문자 제거
+            new_content = new_content.rstrip()
+
+            # 전체 응답에 추가
+            complete_response += new_content
+
+            # 다음 요청을 위해 메시지 업데이트 (원본 메시지는 유지)
+            if stop_reason == "max_tokens":
+                # 마지막 메시지가 assistant인지 확인
+                assistant_exists = False
+                for i in range(len(working_messages) - 1, -1, -1):
+                    if working_messages[i]["role"] == "assistant":
+                        # 기존 assistant 메시지 업데이트
+                        working_messages[i]["content"] = complete_response
+                        assistant_exists = True
+                        break
+
+                if not assistant_exists:
+                    # assistant 메시지가 없으면 새로 추가
+                    working_messages.append(
+                        {"role": "assistant", "content": complete_response}
+                    )
+
+            # 디버깅용 로그 (필요시)
+            print(f"Stop reason: {stop_reason}, Added {len(new_content)} chars")
+
+        return complete_response
 
     else:
         raise ValueError(f"지원하지 않는 provider: {provider}")

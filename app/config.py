@@ -31,8 +31,6 @@ class AIClientDelegate:
         self.claude_client = claude_client
 
     def generate_response(self, provider, **kwargs):
-        print(f"AI 제공자: {provider}")
-        print(f"요청 파라미터: {kwargs}")
         try:
             if provider == "openai":
                 return self.openai_client.chat.completions.create(
