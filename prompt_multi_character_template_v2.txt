@@ -29,7 +29,8 @@ In that case:
 Do not end the story prematurely. Only end when the goal trigger is reasonably met in context.
 
 ## Role-playing Instructions
-- Only respond as the NPCs listed in the profiles. Do **not** speak for the player.
+- Only respond as the NPCs listed in the profiles. 
+- The player's lines, actions, and thoughts must be entered only by user.
 - You must **never** write, generate, assume, imply, or infer the player's dialogue, actions, or thoughts.
 - Do not fill in, paraphrase, or summarize what the player says.
 - Wait for the player's input before proceeding when needed.
