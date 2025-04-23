@@ -73,16 +73,21 @@ def generate_npc_dialogue_with_continue(
     elif provider == "claude":
         complete_response = ""
         stop_reason = "max_tokens"
-        working_messages = messages.copy()
+
+        # Claude API 파라미터 구성
+        claude_params = messages.copy()  # build_claude_message에서 반환된 형식 사용
 
         # stop_reason이 max_tokens인 경우 계속 응답을 생성합니다
         while stop_reason == "max_tokens":
+            print(f"요청: {claude_params}")
             response = ai_client_delegate.generate_response(
                 provider=provider,
-                messages=working_messages,
+                **claude_params,
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+
+            print(f"응답: {response}")
 
             # 응답 추출
             new_content = response.content[0].text
@@ -94,25 +99,20 @@ def generate_npc_dialogue_with_continue(
             # 전체 응답에 추가
             complete_response += new_content
 
-            # 다음 요청을 위해 메시지 업데이트 (원본 메시지는 유지)
+            # 다음 요청을 위해 메시지 업데이트
             if stop_reason == "max_tokens":
                 # 마지막 메시지가 assistant인지 확인
-                assistant_exists = False
-                for i in range(len(working_messages) - 1, -1, -1):
-                    if working_messages[i]["role"] == "assistant":
-                        # 기존 assistant 메시지 업데이트
-                        working_messages[i]["content"] = complete_response
-                        assistant_exists = True
-                        break
-
-                if not assistant_exists:
-                    # assistant 메시지가 없으면 새로 추가
-                    working_messages.append(
+                if (
+                    claude_params["messages"]
+                    and claude_params["messages"][-1]["role"] == "assistant"
+                ):
+                    # 기존 assistant 메시지 업데이트
+                    claude_params["messages"][-1]["content"] = complete_response
+                else:
+                    # assistant 메시지 추가
+                    claude_params["messages"].append(
                         {"role": "assistant", "content": complete_response}
                     )
-
-            # 디버깅용 로그 (필요시)
-            print(f"Stop reason: {stop_reason}, Added {len(new_content)} chars")
 
         return complete_response
 

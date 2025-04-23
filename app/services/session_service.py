@@ -80,24 +80,26 @@ def build_messages(provider, system_prompt, short_memory, player_input):
 
 
 def build_claude_message(system_prompt, short_memory, player_input=None):
-    history_str = ""
+    # Claude API 메시지 포맷 구성
+    messages = []
+
+    # 대화 기록 추가
     for msg in short_memory:
         if msg["role"] == "user":
-            history_str += f"\n플레이어: {msg['content']}"
+            messages.append({"role": "user", "content": msg["content"]})
         elif msg["role"] == "assistant":
-            history_str += f"\n{msg['content']}"
+            messages.append({"role": "assistant", "content": msg["content"]})
 
-    # ⚠️ 여기서 player_input은 이미 short_memory에 들어간 상태이므로 따로 추가하지 않음
-    return [
-        {
-            "role": "user",
-            "content": f"""{system_prompt}
+    # 플레이어 입력이 있으면 추가
+    if player_input:
+        messages.append({"role": "user", "content": player_input})
 
-# Current Role-play
-{history_str}
-""",
-        }
+    # system 프롬프트를 ephemeral로 설정
+    system = [
+        {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
     ]
+
+    return {"system": system, "messages": messages}
 
 
 def generate_single_npc_dialogue(session_id, player_input, provider="openai"):

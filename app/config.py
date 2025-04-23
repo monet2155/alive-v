@@ -38,10 +38,23 @@ class AIClientDelegate:
                     model="gpt-4-turbo",
                 )
             elif provider == "claude":
-                return self.claude_client.messages.create(
+                # 새로운 Claude API 사용 방식으로 업데이트
+                # system 파라미터가 있는지 확인
+                system = kwargs.pop("system", None)
+                messages = kwargs.pop("messages", [])
+
+                # Claude API 패러미터 구성
+                claude_params = {
+                    "model": "claude-3-7-sonnet-20250219",
+                    "messages": messages,
                     **kwargs,
-                    model="claude-3-7-sonnet-20250219",
-                )
+                }
+
+                # system이 있으면 추가
+                if system:
+                    claude_params["system"] = system
+
+                return self.claude_client.messages.create(**claude_params)
             else:
                 raise ValueError("지원되지 않는 AI 제공자입니다.")
         except Exception as e:
