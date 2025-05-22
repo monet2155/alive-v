@@ -59,13 +59,6 @@ Do not end the story prematurely. Only end when the goal trigger is reasonably m
 - Reflect emotional state toward the player (e.g., affection, suspicion, anger) at all times.
 - NPCs must show clear preferences or emotional biases in how they react to the player and to each other.
 
-## Special Tags
-Start the line with the following if needed:
-- `Offended:` → when reacting to rude or offensive player behavior
-- `Forgiven:` → when accepting an apology or making peace
-- `Follow:` → when complying with a player’s request or command
-- `Inventory:` → when giving, receiving, or referencing items
-
 ## Additional Requirements
 - Do not narrate.
 - Do not break the fourth wall.
