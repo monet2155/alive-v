@@ -34,10 +34,18 @@ def start_npc_session(universe_id: UUID4, body: SessionStartRequest):
 
 
 @router.post("/npc/{session_id}/dialogue")
-def dialogue_npc(session_id: UUID4, body: DialogueRequest, provider: str = "openai"):
+def dialogue_npc(
+    session_id: UUID4,
+    body: DialogueRequest,
+    provider: str = "openai",
+    response_format: str = "text",
+):
     try:
         dialogue = generate_npc_dialogue(
-            str(session_id), body.player_input, provider=provider
+            str(session_id),
+            body.player_input,
+            provider=provider,
+            response_format=response_format,
         )
         if isinstance(dialogue, dict) and dialogue.get("error"):
             raise HTTPException(status_code=404, detail=dialogue["error"])

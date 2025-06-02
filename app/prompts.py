@@ -17,6 +17,15 @@ def load_multi_character_prompt_template():
         return file.read()
 
 
+def load_multi_character_prompt_template_json():
+    with open(
+        f"prompt_multi_character_template_v3.txt",
+        "r",
+        encoding="utf-8",
+    ) as file:
+        return file.read()
+
+
 def load_character_prompt():
     with open("prompt_character.txt", "r", encoding="utf-8") as file:
         return file.read()

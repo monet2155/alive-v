@@ -5,6 +5,7 @@ from ..config import ai_client_delegate
 from ..prompts import (
     load_prompt_template,
     load_multi_character_prompt_template,
+    load_multi_character_prompt_template_json,
     load_long_memory_summary_prompt,
     load_important_memory_extract_prompt,
     load_character_prompt,
@@ -283,7 +284,9 @@ def generate_single_npc_dialogue(session_id, player_input, provider="openai"):
         release_connection(conn)
 
 
-def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
+def generate_multi_npc_dialogue(
+    session_id, player_input, provider="openai", response_format="text"
+):
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
@@ -367,6 +370,10 @@ def generate_multi_npc_dialogue(session_id, player_input, provider="openai"):
 
             # 프롬프트 템플릿 적용 (다중 캐릭터용)
             prompt_template = load_multi_character_prompt_template()
+            if response_format == "json":
+                prompt_template = load_multi_character_prompt_template_json()
+            else:
+                prompt_template = load_multi_character_prompt_template()
 
             system_prompt = prompt_template.format(
                 universe_name=universe.get("name", "알 수 없음"),
@@ -586,7 +593,9 @@ def end_session(session_id):
         release_connection(conn)
 
 
-def generate_npc_dialogue(session_id, player_input, provider="openai"):
+def generate_npc_dialogue(
+    session_id, player_input, provider="openai", response_format="text"
+):
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
@@ -599,9 +608,13 @@ def generate_npc_dialogue(session_id, player_input, provider="openai"):
             )
             npc_count = cursor.fetchone()[0]
             if npc_count == 1:
-                return generate_single_npc_dialogue(session_id, player_input, provider)
+                return generate_single_npc_dialogue(
+                    session_id, player_input, provider, response_format
+                )
             elif npc_count > 1:
-                return generate_multi_npc_dialogue(session_id, player_input, provider)
+                return generate_multi_npc_dialogue(
+                    session_id, player_input, provider, response_format
+                )
             else:
                 return {"error": "세션에 포함된 NPC가 없습니다."}
     except Exception as e:
