@@ -459,8 +459,9 @@ def generate_multi_npc_dialogue(
             short_memory.append({"role": "user", "content": player_input})
             short_memory.append({"role": "assistant", "content": response})
 
-            if len(short_memory) > MAX_MEMORY_LENGTH:
-                short_memory = short_memory[-MAX_MEMORY_LENGTH:]
+            # FIXME: 메모리 제한 해제
+            # if len(short_memory) > MAX_MEMORY_LENGTH:
+            #     short_memory = short_memory[-MAX_MEMORY_LENGTH:]
 
             cursor.execute(
                 """
